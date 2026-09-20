@@ -1,11 +1,271 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <title>Test GitHub</title>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tax Preview App</title>
+
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 1000px;
+      margin: 30px auto;
+      padding: 20px;
+      background: #f3f4f6;
+      color: #1f2937;
+    }
+
+    h1, h2, h3 {
+      color: #111827;
+    }
+
+    section {
+      background: white;
+      padding: 20px;
+      margin-bottom: 20px;
+      border-radius: 8px;
+    }
+
+    .form-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 9px;
+      border: 1px solid #d1d5db;
+      border-radius: 5px;
+    }
+
+    button {
+      padding: 10px 18px;
+      margin-top: 10px;
+      border: 0;
+      border-radius: 5px;
+      background: #2563eb;
+      color: white;
+      cursor: pointer;
+    }
+
+    button:hover {
+      background: #1d4ed8;
+    }
+
+    .previewCard {
+      background: white;
+      border: 1px solid #d1d5db;
+      border-radius: 8px;
+      padding: 15px;
+      margin: 10px 0;
+    }
+
+    .previewGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 12px;
+      margin-top: 12px;
+    }
+
+    .previewGrid > div {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .previewLabel {
+      color: #6b7280;
+      font-size: 14px;
+    }
+
+    .totals {
+      margin-bottom: 20px;
+      padding: 12px;
+      background: #eff6ff;
+      border-radius: 6px;
+    }
+  </style>
 </head>
+
 <body>
-    <h1>Hello GitHub 🚀</h1>
-    <p>Mon premier test fonctionne !</p>
+  <h1>Tax Form Preview</h1>
+
+  <section>
+    <h2>General</h2>
+
+    <label>
+      <input type="checkbox" id="basicPersonal">
+      Basic personal amount
+    </label>
+  </section>
+
+  <section>
+    <h2>T4 Slip</h2>
+
+    <div id="t4Tbody">
+      <div class="form-row">
+        <input class="t-employer" placeholder="Employer">
+        <input class="t-employment" type="number" placeholder="Employment income">
+        <input class="t-cpp" type="number" placeholder="CPP">
+        <input class="t-ei" type="number" placeholder="EI">
+        <input class="t-fedWithheld" type="number" placeholder="Federal tax withheld">
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Relevé</h2>
+
+    <div id="releveTbody">
+      <div class="form-row">
+        <input class="r-issuer" placeholder="Issuer">
+        <input class="r-qpp" type="number" placeholder="QPP">
+        <input class="r-qpip" type="number" placeholder="QPIP">
+        <input class="r-qcWithheld" type="number" placeholder="Québec tax withheld">
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>RRSP</h2>
+
+    <div id="rrspTbody">
+      <div class="form-row">
+        <input class="rr-issuer" placeholder="Slip line type">
+        <input class="rr-amount" type="number" placeholder="RRSP amount">
+      </div>
+    </div>
+  </section>
+
+  <button id="previewButton" type="button">
+    Build Preview
+  </button>
+
+  <section id="preview">
+    <h2>Preview</h2>
+
+    <h3>T4 Details</h3>
+    <div id="t4Lines"></div>
+    <div id="t4Totals" class="totals"></div>
+
+    <h3>Relevé Details</h3>
+    <div id="releveLines"></div>
+    <div id="releveTotals" class="totals"></div>
+
+    <h3>RRSP Details</h3>
+    <div id="rrspLines"></div>
+    <div id="rrspTotals" class="totals"></div>
+  </section>
+
+  <script>
+    // Finds an element by its id.
+    const $ = id => document.getElementById(id);
+
+    function moneyShort(value) {
+      return new Intl.NumberFormat("en-CA", {
+        style: "currency",
+        currency: "CAD"
+      }).format(Number(value || 0));
+    }
+
+    function escapeHtml(value) {
+      return String(value ?? "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;")
+        .replace(/'/g, "&#039;");
+    }
+
+    function mkLineBlock(title, rows, fields) {
+      return `
+        <div>
+          <h3>${escapeHtml(title)}</h3>
+
+          ${rows.map((row, index) => `
+            <div class="previewCard">
+              <strong>Row ${index + 1}</strong>
+
+              <div class="previewGrid">
+                ${fields(row).map(field => `
+                  <div>
+                    <span class="previewLabel">
+                      ${escapeHtml(field.k)}
+                    </span>
+                    <span>${escapeHtml(field.v)}</span>
+                  </div>
+                `).join("")}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      `;
+    }
+
+    function readForm() {
+      const t4Slips = Array.from($("t4Tbody").children).map(tr => ({
+        employer: tr.querySelector(".t-employer").value,
+        employmentIncome: tr.querySelector(".t-employment").value,
+        cppContributions: tr.querySelector(".t-cpp").value,
+        eiPremiums: tr.querySelector(".t-ei").value,
+        federalIncomeTaxWithheld: tr.querySelector(".t-fedWithheld").value
+      }));
+
+      const releveLines = Array.from($("releveTbody").children).map(tr => ({
+        issuer: tr.querySelector(".r-issuer").value,
+        qppContributions: tr.querySelector(".r-qpp").value,
+        qpipPremiums: tr.querySelector(".r-qpip").value,
+        quebecIncomeTaxWithheld: tr.querySelector(".r-qcWithheld").value
+      }));
+
+      const rrspRows = Array.from($("rrspTbody").children).map(tr => ({
+        slipLineType: tr.querySelector(".rr-issuer").value,
+        amount: tr.querySelector(".rr-amount").value
+      }));
+
+      return {
+        basicPersonal: $("basicPersonal").checked,
+        rrspContributionTotal: rrspRows.reduce(
+          (total, row) => total + Number(row.amount || 0),
+          0
+        ),
+        rrspRows,
+        t4Slips,
+        releveLines
+      };
+    }
+
+    /*
+      PASTE YOUR buildPreviewFromInputs(input) FUNCTION HERE.
+
+      Paste the complete function from your previous message,
+      starting with:
+
+      function buildPreviewFromInputs(input) {
+
+      and ending with:
+
+      }
+    */
+
+    function renderPreview() {
+      const input = readForm();
+      const preview = buildPreviewFromInputs(input);
+
+      $("t4Lines").innerHTML = preview.t4LinesHtml;
+      $("t4Totals").innerHTML = preview.t4TotalsHtml;
+
+      $("releveLines").innerHTML = preview.releveLinesHtml;
+      $("releveTotals").innerHTML = preview.releveTotalsHtml;
+
+      $("rrspLines").innerHTML = preview.rrspLinesHtml;
+      $("rrspTotals").innerHTML = preview.rrspTotalsHtml;
+    }
+
+    $("previewButton").addEventListener("click", renderPreview);
+  </script>
 </body>
 </html>
